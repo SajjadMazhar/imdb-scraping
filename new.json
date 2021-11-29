@@ -1,0 +1,14 @@
+{
+    "name": "sajjad",
+    "age": 23,
+    "languages": [
+        "Python",
+        "JavaScript"
+    ],
+    "tuple": [
+        3,
+        4,
+        5,
+        6
+    ]
+}

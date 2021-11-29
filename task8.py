@@ -1,33 +1,19 @@
-import requests, pprint, os, json
+from typing_extensions import runtime
+import requests, json, os
 from bs4 import BeautifulSoup
 
-# task6
-def analyse_movies_language(movie_list):
-    counts={"Hindi":0, "English":0, "Tamil":0, "Malayalam":0}
-    for details in movie_list:
-        for lang in details["language"]:
-            if lang in counts:
-                counts[lang]+=1
-    return counts
-            
-# task5
-def get_movie_list_details():
-    top_movies = scrape_top_list()
-    movies = []
-    for details in top_movies:
-        movieLink = details["url"]
-        moreDetails = scrape_movie_details(movieLink)
-        movies.append(moreDetails)
-    return movies
-
-
-# task 4
 def scrape_movie_details(movie_url):
     movie_id = ""
-    for _id in movie_url[27:37]:
-        movie_id+=_id
+    for _id in movie_url[27:]:
+        if _id != '/':
+            movie_id+=_id
+        else:
+            break
     fileName = movie_id+".json"
-    if not os.path.exists(fileName):
+    if os.path.exists(f"data/{fileName}"):
+        with open(f"data/{fileName}", 'r') as f:
+            dic = json.load(f)
+    else:        
         directors = []
         genres =[]
         languages=[]
@@ -42,12 +28,34 @@ def scrape_movie_details(movie_url):
             directors.append(direc.text)
         ## directors stored here
 
+        titleBlock = soup.find("div", class_="TitleBlock__TitleContainer-sc-1nlhx7j-1 jxsVNt")
+        runtimeBlock = titleBlock.find("div", class_="TitleBlock__TitleMetaDataContainer-sc-1nlhx7j-2 hWHMKr").ul
+        runtimeString =runtimeBlock.find_all("li")[-1].text
+        hour = ""
+        mint = ""
+        for h in runtimeString:
+            if h != 'h':
+                hour+=h
+            else:
+                break
+        for m in range(-2, -len(runtimeString), -1):
+            if runtimeString[m]!=' ':
+                mint = runtimeString[m]+mint
+            else:
+                break
+        runtime = int(hour)*60 + int(mint)
+        print(runtime)
 
-        runtimediv = title_runtime_div.find("div", class_="TitleBlock__TitleMetaDataContainer-sc-1nlhx7j-2 hWHMKr").ul
-        runtime= runtimediv.find_all("li")[2].text ## here is the runtime
+            
+
+            
+        # runtimediv = title_runtime_div.find("div", class_="TitleBlock__TitleMetaDataContainer-sc-1nlhx7j-2 hWHMKr").ul
+        # runtime= runtimediv.find_all("li")[-1].text ## here is the runtime
         
-        genre_summary = soup.find("div", class_="GenresAndPlot__ContentParent-cum89p-8 bFvaWW Hero__GenresAndPlotContainer-kvkd64-11 twqaW")
-        genreDiv = genre_summary.find("div", class_="ipc-chip-list GenresAndPlot__GenresChipList-cum89p-4 gtBDBL")
+        genre_summary = soup.find("div", class_="GenresAndPlot__OffsetContentParent-cum89p-9 dUAPpa Hero__GenresAndPlotContainer-kvkd64-11 twqaW")
+        if not genre_summary:
+            genre_summary = soup.find("div", class_="GenresAndPlot__ContentParent-cum89p-8 bFvaWW Hero__GenresAndPlotContainer-kvkd64-11 twqaW")
+        genreDiv = genre_summary.find("div").find_all("a")
         for genre in genreDiv:
             genres.append(genre.find("span").text)
         ## genres added here
@@ -56,10 +64,16 @@ def scrape_movie_details(movie_url):
 
 
         country_lang = soup.find("ul", class_="ipc-metadata-list ipc-metadata-list--dividers-all ipc-metadata-list--base")
-        country = country_lang.find_all("li", class_="ipc-inline-list__item")[1].a.text # country is here
-        lang = country_lang.find_all("li", class_="ipc-inline-list__item")[2] # language is here
+        if not country_lang:
+            country_lang = soup.find("ul", class_="ipc-inline-list ipc-inline-list--show-dividers ipc-inline-list--inline ipc-metadata-list-item__list-content base")
+
+        detail_section = soup.find("section", attrs={'data-testid':'Details', 'class':'ipc-page-section ipc-page-section--base celwidget'})
+        detail_ul = detail_section.find("ul", class_="ipc-metadata-list ipc-metadata-list--dividers-all ipc-metadata-list--base")
+        country= detail_ul.find_all("li")[2].a.text # country is here
+        lang_li = detail_ul.find("li", attrs={'data-testid':'title-details-languages'}).find("ul")
+        lang = lang_li.find_all("li", class_="ipc-inline-list__item")
         for language in lang:
-            languages.append(language.text)
+            languages.append(language.find("a").text)
         #languages done
 
         img_url = soup.find("a", class_="ipc-lockup-overlay ipc-focusable")['href'] # poster url is here
@@ -73,49 +87,12 @@ def scrape_movie_details(movie_url):
             "runtime":runtime,
             "genre":genres
         }
-        with open(fileName, "w") as f:
+        with open(f"data/{fileName}", "w") as f:
             json.dump(dic, f, indent=4)
-    else:
-        with open(fileName, 'r') as f:
-            dic = json.load(f)
+    
     return dic
 
 
-# task3
-def group_by_decade(movies):
-    grouped_by_year = group_by_year(movies)
-    decades = [x for x in range(1950, 2022) if x%10 == 0]
-    decade_wise = []
-    for decs in decades:
-        decDict = {decs:[]}
-        for details in grouped_by_year:
-            # pprint.pprint(details)
-            for year, movie in details.items():
-                # print(year)
-                if year not in decDict:
-                    if year>=decs and year<decs+10:
-                        decDict[decs].extend(movie)
-        
-        decade_wise.append(decDict)
-    return decade_wise
-
-
-# task2
-def group_by_year(movies):
-    years = []
-    for movie in movies:
-        years.append(movie['year'])
-    sorted_years = sorted(list(set(years)))
-    yearWisedMovies=[]
-    for year in sorted_years:
-        yearDict = {year:[]}
-        for movieNames in movies:
-            if movieNames["year"] == year:
-                yearDict[year].append(movieNames)
-        yearWisedMovies.append(yearDict)
-    return yearWisedMovies
-
-# task1
 def scrape_top_list():
     if not os.path.exists("topList.json"):
 
@@ -165,19 +142,10 @@ def scrape_top_list():
             all_contents = json.load(f)
         print("cache")
     return all_contents
-    
-for i in range(10):
-    scrape_movie_details(scrape_top_list()[i]['url'])
 
-# movies = []
-# for i in range(10):
-#     obj = scrape_movie_details(scrape_top_list()[i]['url'])
-#     movies.append(obj)
-#     with open('details_list.json', 'w') as f:
-#         json.dump(movies, f, indent=4)
-# with open("details_list.json", 'r') as f:
-#     content = json.load(f)
+movies= scrape_top_list()
+for i in range(len(movies)):
 
-# print(analyse_movies_language(content))
-
-    
+    scrape_movie_details(movies[i]['url'])
+    print("done", i)
+# scrape_movie_details(movies[12]['url'])
