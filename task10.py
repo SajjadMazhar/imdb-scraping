@@ -23,4 +23,5 @@ for director in directors:
                     langs[lang] += 1
     languages_with_director.append({director:langs})
 
-pprint(languages_with_director)
+with open("task10.json", 'w') as f:
+    json.dump(languages_with_director, f, indent=4)
